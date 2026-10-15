@@ -31,3 +31,27 @@ export const getAllWalkers = async (): Promise<Walker[]> => {
 
   return result.rows;
 };
+
+
+
+export const getWalkerById = async (
+  id: number
+): Promise<Walker | null> => {
+  const result = await pool.query<Walker>(
+    `SELECT
+      id,
+      name,
+      photo_url,
+      bio,
+      rating,
+      review_count,
+      distance_km,
+      price_per_hour,
+      available
+    FROM walkers
+    WHERE id = $1`,
+    [id]
+  );
+
+  return result.rows[0] ?? null;
+};
