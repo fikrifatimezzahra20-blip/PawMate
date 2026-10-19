@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-
+import dogRoutes from './routes/dog.routes.js';
+import bookingRoutes from './routes/booking.routes.js';
 import walkerRoutes from './routes/walker.routes.js';
 import { errorMiddleware } from './middlewares/error.middleware.js';
 
@@ -17,6 +18,8 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/walkers', walkerRoutes);
+app.use('/api/dogs', dogRoutes);
+app.use('/api/bookings', bookingRoutes);
 
 app.use(errorMiddleware);
 
