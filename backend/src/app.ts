@@ -3,6 +3,7 @@ import cors from 'cors';
 import dogRoutes from './routes/dog.routes.js';
 import bookingRoutes from './routes/booking.routes.js';
 import walkerRoutes from './routes/walker.routes.js';
+import authRoutes from './routes/auth.routes.js';
 import { errorMiddleware } from './middlewares/error.middleware.js';
 
 const app = express();
@@ -10,6 +11,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use('/api/auth', authRoutes);
 app.get('/api/health', (_req, res) => {
   res.status(200).json({
     status: 'success',
