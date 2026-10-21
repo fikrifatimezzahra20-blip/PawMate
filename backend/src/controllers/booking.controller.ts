@@ -1,8 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
-import {
-  getAllBookings,
-  createBooking,
-} from '../models/booking.model.js';
+import { getAllBookings, createBooking } from '../models/booking.model.js';
+
+type AuthUser = { userId: number; role: 'owner' | 'walker' };
 
 export const getBookings = async (
   _req: Request,
@@ -10,7 +9,8 @@ export const getBookings = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const bookings = await getAllBookings();
+    const user = res.locals.user as AuthUser;
+    const bookings = await getAllBookings(user.userId, user.role);
 
     res.status(200).json({
       status: 'success',
@@ -28,7 +28,17 @@ export const addBooking = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { walker_id, dog_id, booking_date, duration_hours } = req.body;
+    const user = res.locals.user as AuthUser;
+
+    if (user.role !== 'owner') {
+      res.status(403).json({
+        status: 'error',
+        message: 'Only owners can create bookings.',
+      });
+      return;
+    }
+
+    const { walker_id, dog_id, booking_date, duration_hours } = req.body ?? {};
 
     if (
       !Number.isInteger(walker_id) ||
@@ -60,6 +70,7 @@ export const addBooking = async (
     }
 
     const booking = await createBooking({
+      owner_id: user.userId,
       walker_id,
       dog_id,
       booking_date: bookingDate.toISOString(),
@@ -69,7 +80,7 @@ export const addBooking = async (
     if (!booking) {
       res.status(404).json({
         status: 'error',
-        message: 'Available walker or dog not found.',
+        message: 'Your dog or the available walker was not found.',
       });
       return;
     }
