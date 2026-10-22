@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  SafeAreaView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -9,6 +8,7 @@ import {
   Alert,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppButton } from '../components/AppButton';
 import { useLoginMutation, useRegisterMutation } from '../services/auth';
@@ -31,10 +31,7 @@ export default function AuthScreen() {
 
   const loginMutation = useLoginMutation({
     onSuccess: (data) => {
-      Alert.alert(
-        'Success',
-        `Welcome back, ${data.user.full_name || 'Dog Lover'}!`
-      );
+      router.replace('/(tabs)');
     },
     onError: (error) => {
       Alert.alert('Login Failed', error.message || 'Unable to log in.');
@@ -43,10 +40,7 @@ export default function AuthScreen() {
 
   const registerMutation = useRegisterMutation({
     onSuccess: (data) => {
-      Alert.alert(
-        'Account Created',
-        `Welcome to PawMate, ${data.user.full_name}!`
-      );
+      router.replace('/(tabs)');
     },
     onError: (error) => {
       Alert.alert('Registration Failed', error.message || 'Unable to create account.');
