@@ -101,3 +101,31 @@ export const createBooking = async (
     client.release();
   }
 };
+
+
+export const updateBookingStatus = async (
+  bookingId: number,
+  walkerUserId: number,
+  status: 'confirmed' | 'cancelled',
+): Promise<Booking | null> => {
+  const result = await pool.query<Booking>(
+    `UPDATE bookings AS b
+     SET status = $3
+     FROM walkers AS w
+     WHERE b.walker_id = w.id
+       AND w.user_id = $2
+       AND b.id = $1
+       AND b.status = 'pending'
+     RETURNING
+       b.id,
+       b.walker_id,
+       b.dog_id,
+       b.booking_date,
+       b.duration_hours,
+       b.total_price,
+       b.status`,
+    [bookingId, walkerUserId, status],
+  );
+
+  return result.rows[0] ?? null;
+};

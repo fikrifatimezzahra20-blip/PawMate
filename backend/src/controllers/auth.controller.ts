@@ -1,9 +1,11 @@
+
 import type { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 import {
   createUser,
+  createWalkerAccountAndLink,
   findUserByEmail,
   findUserById,
 } from '../models/user.model.js';
@@ -20,7 +22,14 @@ const createToken = (userId: number, role: 'owner' | 'walker') => {
 
 export const register = async (req: Request, res: Response) => {
   try {
-    const { full_name, email, password, role, phone } = req.body ?? {};
+    const {
+      full_name,
+      email,
+      password,
+      role,
+      phone,
+      walker_id,
+    } = req.body ?? {};
 
     if (
       typeof full_name !== 'string' ||
@@ -42,7 +51,9 @@ export const register = async (req: Request, res: Response) => {
     }
 
     if (email.trim().length > 255) {
-      return res.status(400).json({ message: 'Email is too long.' });
+      return res.status(400).json({
+        message: 'Email is too long.',
+      });
     }
 
     if (password.length < 8) {
@@ -51,13 +62,26 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    if (phone !== undefined && (
-      typeof phone !== 'string' || phone.length > 30
-    )) {
-      return res.status(400).json({ message: 'Invalid phone number.' });
+    if (
+      phone !== undefined &&
+      (typeof phone !== 'string' || phone.length > 30)
+    ) {
+      return res.status(400).json({
+        message: 'Invalid phone number.',
+      });
+    }
+
+    if (
+      role === 'walker' &&
+      (!Number.isInteger(walker_id) || walker_id <= 0)
+    ) {
+      return res.status(400).json({
+        message: 'A valid walker_id is required for walker registration.',
+      });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+
     const existingUser = await findUserByEmail(normalizedEmail);
 
     if (existingUser) {
@@ -68,13 +92,35 @@ export const register = async (req: Request, res: Response) => {
 
     const password_hash = await bcrypt.hash(password, 12);
 
-    const user = await createUser({
-      full_name,
-      email: normalizedEmail,
-      password_hash,
-      role,
-      phone,
-    });
+    let user;
+
+    if (role === 'walker') {
+      user = await createWalkerAccountAndLink(
+        {
+          full_name,
+          email: normalizedEmail,
+          password_hash,
+          role: 'walker',
+          phone,
+        },
+        walker_id,
+      );
+
+      if (!user) {
+        return res.status(409).json({
+          message:
+            'This walker profile is unavailable or already linked to an account.',
+        });
+      }
+    } else {
+      user = await createUser({
+        full_name,
+        email: normalizedEmail,
+        password_hash,
+        role,
+        phone,
+      });
+    }
 
     const token = createToken(user.id, user.role);
 
@@ -127,6 +173,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const token = createToken(user.id, user.role);
+
     const { password_hash: _passwordHash, ...safeUser } = user;
 
     return res.status(200).json({
@@ -148,13 +195,17 @@ export const getMe = async (_req: Request, res: Response) => {
     const userId = res.locals.user?.userId;
 
     if (!Number.isInteger(userId)) {
-      return res.status(401).json({ message: 'Authentication required.' });
+      return res.status(401).json({
+        message: 'Authentication required.',
+      });
     }
 
     const user = await findUserById(userId);
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found.' });
+      return res.status(404).json({
+        message: 'User not found.',
+      });
     }
 
     return res.status(200).json({ user });

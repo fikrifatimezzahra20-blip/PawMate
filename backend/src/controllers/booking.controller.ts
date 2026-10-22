@@ -1,5 +1,9 @@
 import type { Request, Response, NextFunction } from 'express';
-import { getAllBookings, createBooking } from '../models/booking.model.js';
+import {
+  getAllBookings,
+  createBooking,
+  updateBookingStatus,
+} from '../models/booking.model.js';
 
 type AuthUser = { userId: number; role: 'owner' | 'walker' };
 
@@ -94,3 +98,68 @@ export const addBooking = async (
     next(error);
   }
 };
+
+
+const handleWalkerDecision = (
+  status: 'confirmed' | 'cancelled',
+  message: string,
+) => async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const user = res.locals.user as AuthUser;
+
+    if (user.role !== 'walker') {
+      res.status(403).json({
+        status: 'error',
+        message: 'Only walkers can accept or reject bookings.',
+      });
+      return;
+    }
+
+    const bookingId = Number(req.params.id);
+
+    if (!Number.isInteger(bookingId) || bookingId <= 0) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Invalid booking ID.',
+      });
+      return;
+    }
+
+    const booking = await updateBookingStatus(
+      bookingId,
+      user.userId,
+      status,
+    );
+
+    if (!booking) {
+      res.status(404).json({
+        status: 'error',
+        message:
+          'Booking not found, not assigned to you, or no longer pending.',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      status: 'success',
+      message,
+      data: booking,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const acceptBooking = handleWalkerDecision(
+  'confirmed',
+  'Booking accepted successfully.',
+);
+
+export const rejectBooking = handleWalkerDecision(
+  'cancelled',
+  'Booking rejected successfully.',
+);

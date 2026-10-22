@@ -69,3 +69,54 @@ export const createUser = async (
 
   return result.rows[0];
 };
+
+
+export const createWalkerAccountAndLink = async (
+  user: CreateUserInput,
+  walkerId: number,
+): Promise<Omit<User, 'password_hash'> | null> => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const userResult = await client.query<Omit<User, 'password_hash'>>(
+      `INSERT INTO users
+        (full_name, email, password_hash, role, phone, profile_photo_url)
+       VALUES ($1, $2, $3, 'walker', $4, $5)
+       RETURNING id, full_name, email, role, phone, profile_photo_url, created_at`,
+      [
+        user.full_name.trim(),
+        user.email.toLowerCase().trim(),
+        user.password_hash,
+        user.phone ?? null,
+        user.profile_photo_url ?? null,
+      ],
+    );
+
+    const newUser = userResult.rows[0];
+
+    const walkerResult = await client.query(
+      `UPDATE walkers
+       SET user_id = $1
+       WHERE id = $2
+         AND user_id IS NULL
+         AND available = TRUE
+       RETURNING id`,
+      [newUser.id, walkerId],
+    );
+
+    if (walkerResult.rowCount !== 1) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    await client.query('COMMIT');
+    return newUser;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
