@@ -130,12 +130,14 @@ export const register = async (req: Request, res: Response) => {
       user,
     });
   } catch (error) {
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      error.code === '23505'
-    ) {
+    const isUniqueError =
+      (typeof error === 'object' &&
+        error !== null &&
+        (('name' in error && error.name === 'SequelizeUniqueConstraintError') ||
+          ('code' in error && error.code === '23505') ||
+          ('parent' in error && (error as any).parent?.code === '23505')));
+
+    if (isUniqueError) {
       return res.status(409).json({
         message: 'An account with this email already exists.',
       });

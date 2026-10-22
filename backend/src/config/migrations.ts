@@ -1,44 +1,18 @@
-import pool from './db.js';
+import sequelize from './db.js';
+import '../models/associations.js';
 
 export const runMigrations = async (): Promise<void> => {
-  const client = await pool.connect();
-
   try {
-    await client.query('BEGIN');
+    await sequelize.authenticate();
+    console.log('Sequelize connected to PostgreSQL successfully.');
 
-    await client.query(`
-      ALTER TABLE dogs
-      ADD COLUMN IF NOT EXISTS owner_id INTEGER
-      REFERENCES users(id) ON DELETE SET NULL
-    `);
-
-    await client.query(`
-      ALTER TABLE walkers
-      ADD COLUMN IF NOT EXISTS user_id INTEGER UNIQUE
-      REFERENCES users(id) ON DELETE SET NULL
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_dogs_owner_id
-      ON dogs(owner_id)
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_bookings_dog_id
-      ON bookings(dog_id)
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_bookings_walker_id
-      ON bookings(walker_id)
-    `);
-
-    await client.query('COMMIT');
-    console.log('Database migrations completed.');
+    // Synchronize models with the database schema
+    await sequelize.sync({ alter: true });
+    console.log('Database models synchronized successfully.');
   } catch (error) {
-    await client.query('ROLLBACK');
+    console.error('Sequelize synchronization error:', error);
     throw error;
-  } finally {
-    client.release();
   }
 };
+
+export default runMigrations;

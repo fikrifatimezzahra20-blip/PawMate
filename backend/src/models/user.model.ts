@@ -1,6 +1,8 @@
-import pool from '../config/db.js';
+import { DataTypes, Model, Optional } from 'sequelize';
+import sequelize from '../config/db.js';
+import Walker from './walker.model.js';
 
-export interface User {
+export interface UserAttributes {
   id: number;
   full_name: string;
   email: string;
@@ -8,8 +10,75 @@ export interface User {
   role: 'owner' | 'walker';
   phone: string | null;
   profile_photo_url: string | null;
-  created_at: Date;
+  created_at?: Date;
 }
+
+export type UserCreationAttributes = Optional<
+  UserAttributes,
+  'id' | 'phone' | 'profile_photo_url' | 'created_at'
+>;
+
+export class User
+  extends Model<UserAttributes, UserCreationAttributes>
+  implements UserAttributes
+{
+  declare id: number;
+  declare full_name: string;
+  declare email: string;
+  declare password_hash: string;
+  declare role: 'owner' | 'walker';
+  declare phone: string | null;
+  declare profile_photo_url: string | null;
+  declare created_at: Date;
+}
+
+User.init(
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
+    full_name: {
+      type: DataTypes.STRING(100),
+      allowNull: false,
+    },
+    email: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+      unique: true,
+    },
+    password_hash: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    role: {
+      type: DataTypes.ENUM('owner', 'walker'),
+      allowNull: false,
+    },
+    phone: {
+      type: DataTypes.STRING(30),
+      allowNull: true,
+    },
+    profile_photo_url: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    created_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
+  },
+  {
+    sequelize,
+    tableName: 'users',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: false,
+  }
+);
+
+export type UserWithoutPassword = Omit<UserAttributes, 'password_hash'>;
 
 export interface CreateUserInput {
   full_name: string;
@@ -22,101 +91,79 @@ export interface CreateUserInput {
 
 export const findUserByEmail = async (
   email: string
-): Promise<User | undefined> => {
-  const result = await pool.query<User>(
-    `SELECT id, full_name, email, password_hash, role,
-            phone, profile_photo_url, created_at
-     FROM users
-     WHERE email = $1`,
-    [email.toLowerCase().trim()]
-  );
+): Promise<UserAttributes | undefined> => {
+  const user = await User.findOne({
+    where: { email: email.toLowerCase().trim() },
+  });
 
-  return result.rows[0];
+  return user ? user.get({ plain: true }) : undefined;
 };
 
 export const findUserById = async (
   id: number
-): Promise<Omit<User, 'password_hash'> | undefined> => {
-  const result = await pool.query<Omit<User, 'password_hash'>>(
-    `SELECT id, full_name, email, role, phone,
-            profile_photo_url, created_at
-     FROM users
-     WHERE id = $1`,
-    [id]
-  );
+): Promise<UserWithoutPassword | undefined> => {
+  const user = await User.findByPk(id, {
+    attributes: { exclude: ['password_hash'] },
+  });
 
-  return result.rows[0];
+  return user ? (user.get({ plain: true }) as UserWithoutPassword) : undefined;
 };
 
 export const createUser = async (
-  user: CreateUserInput
-): Promise<Omit<User, 'password_hash'>> => {
-  const result = await pool.query<Omit<User, 'password_hash'>>(
-    `INSERT INTO users
-      (full_name, email, password_hash, role, phone, profile_photo_url)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id, full_name, email, role, phone,
-               profile_photo_url, created_at`,
-    [
-      user.full_name.trim(),
-      user.email.toLowerCase().trim(),
-      user.password_hash,
-      user.role,
-      user.phone ?? null,
-      user.profile_photo_url ?? null,
-    ]
-  );
+  input: CreateUserInput
+): Promise<UserWithoutPassword> => {
+  const user = await User.create({
+    full_name: input.full_name.trim(),
+    email: input.email.toLowerCase().trim(),
+    password_hash: input.password_hash,
+    role: input.role,
+    phone: input.phone ?? null,
+    profile_photo_url: input.profile_photo_url ?? null,
+  });
 
-  return result.rows[0];
+  const plain = user.get({ plain: true });
+  const { password_hash: _pass, ...safeUser } = plain;
+  return safeUser;
 };
 
-
 export const createWalkerAccountAndLink = async (
-  user: CreateUserInput,
-  walkerId: number,
-): Promise<Omit<User, 'password_hash'> | null> => {
-  const client = await pool.connect();
+  userInput: CreateUserInput,
+  walkerId: number
+): Promise<UserWithoutPassword | null> => {
+  return await sequelize.transaction(async (t) => {
+    const walker = await Walker.findOne({
+      where: {
+        id: walkerId,
+        user_id: null,
+        available: true,
+      },
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
 
-  try {
-    await client.query('BEGIN');
-
-    const userResult = await client.query<Omit<User, 'password_hash'>>(
-      `INSERT INTO users
-        (full_name, email, password_hash, role, phone, profile_photo_url)
-       VALUES ($1, $2, $3, 'walker', $4, $5)
-       RETURNING id, full_name, email, role, phone, profile_photo_url, created_at`,
-      [
-        user.full_name.trim(),
-        user.email.toLowerCase().trim(),
-        user.password_hash,
-        user.phone ?? null,
-        user.profile_photo_url ?? null,
-      ],
-    );
-
-    const newUser = userResult.rows[0];
-
-    const walkerResult = await client.query(
-      `UPDATE walkers
-       SET user_id = $1
-       WHERE id = $2
-         AND user_id IS NULL
-         AND available = TRUE
-       RETURNING id`,
-      [newUser.id, walkerId],
-    );
-
-    if (walkerResult.rowCount !== 1) {
-      await client.query('ROLLBACK');
+    if (!walker) {
       return null;
     }
 
-    await client.query('COMMIT');
-    return newUser;
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+    const newUser = await User.create(
+      {
+        full_name: userInput.full_name.trim(),
+        email: userInput.email.toLowerCase().trim(),
+        password_hash: userInput.password_hash,
+        role: 'walker',
+        phone: userInput.phone ?? null,
+        profile_photo_url: userInput.profile_photo_url ?? null,
+      },
+      { transaction: t }
+    );
+
+    walker.user_id = newUser.id;
+    await walker.save({ transaction: t });
+
+    const plain = newUser.get({ plain: true });
+    const { password_hash: _pass, ...safeUser } = plain;
+    return safeUser;
+  });
 };
+
+export default User;

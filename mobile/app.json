@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "mobile",
+    "slug": "mobile",
+    "scheme": "pawmate",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/pawmate.logo.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/pawmate.logo.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/pawmate.logo.png"
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
