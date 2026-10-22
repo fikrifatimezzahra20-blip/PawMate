@@ -7,16 +7,20 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppButton } from '../components/AppButton';
 import { useLoginMutation, useRegisterMutation } from '../services/auth';
+import { useAuthStore } from '../store/useAuthStore';
 
 const RED = '#C8102E';
 
 export default function AuthScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ mode?: string; role?: 'owner' | 'walker' }>();
+
+  const { user, isAuthenticated, logout } = useAuthStore();
 
   const isSignup = params.mode === 'signup';
   const selectedRole = params.role ?? 'owner';
@@ -75,6 +79,23 @@ export default function AuthScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.formContent}>
+        {isAuthenticated && user ? (
+          <View style={styles.sessionCard}>
+            <Text style={styles.sessionTitle}>Active Session</Text>
+            <Text style={styles.sessionUser}>Logged in as: {user.full_name}</Text>
+            <Text style={styles.sessionRole}>Role: {user.role === 'owner' ? 'Dog Owner 🐶' : 'Dog Walker 🦮'}</Text>
+            <Text style={styles.sessionEmail}>{user.email}</Text>
+            <AppButton
+              title="Log Out"
+              secondary
+              onPress={() => {
+                logout();
+                Alert.alert('Logged Out', 'You have been logged out.');
+              }}
+            />
+          </View>
+        ) : null}
+
         <Text style={styles.title}>
           {isSignup ? 'Create Account' : 'Welcome Back'}
         </Text>
@@ -159,6 +180,39 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: 25,
+  },
+  sessionCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  sessionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  sessionUser: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  sessionRole: {
+    fontSize: 14,
+    color: RED,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  sessionEmail: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
+    marginBottom: 10,
   },
   title: {
     fontSize: 27,

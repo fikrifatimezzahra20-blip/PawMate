@@ -15,7 +15,8 @@
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "~4.26.0"
+    "react-native-screens": "~4.26.0",
+    "zustand": "^5.0.16"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
@@ -23,6 +24,7 @@
   },
   "scripts": {
     "start": "expo start",
+    "dev": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"

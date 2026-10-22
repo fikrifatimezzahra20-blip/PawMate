@@ -1,11 +1,29 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-const DEFAULT_DEV_URL =
-  Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
+const getBaseUrl = (): string => {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
 
-export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || DEFAULT_DEV_URL;
+  // Dynamically resolve the Metro server host IP (e.g. 192.168.1.123)
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const ip = hostUri.split(':')[0];
+    if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+      return `http://${ip}:3000`;
+    }
+  }
+
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:3000';
+  }
+
+  return 'http://192.168.1.123:3000';
+};
+
+export const API_BASE_URL = getBaseUrl();
 
 let currentAuthToken: string | null = null;
 

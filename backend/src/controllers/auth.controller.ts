@@ -73,10 +73,12 @@ export const register = async (req: Request, res: Response) => {
 
     if (
       role === 'walker' &&
+      walker_id !== undefined &&
+      walker_id !== null &&
       (!Number.isInteger(walker_id) || walker_id <= 0)
     ) {
       return res.status(400).json({
-        message: 'A valid walker_id is required for walker registration.',
+        message: 'Invalid walker_id provided.',
       });
     }
 

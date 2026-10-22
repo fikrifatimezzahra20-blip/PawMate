@@ -126,25 +126,48 @@ export const createUser = async (
   return safeUser;
 };
 
-export const createWalkerAccountAndLink = async (
+export const createWalkerUser = async (
   userInput: CreateUserInput,
-  walkerId: number
+  walkerId?: number | null
 ): Promise<UserWithoutPassword | null> => {
   return await sequelize.transaction(async (t) => {
-    const walker = await Walker.findOne({
-      where: {
-        id: walkerId,
-        user_id: null,
-        available: true,
-      },
-      transaction: t,
-      lock: t.LOCK.UPDATE,
-    });
+    // If walkerId is provided, link to that existing walker profile
+    if (walkerId) {
+      const walker = await Walker.findOne({
+        where: {
+          id: walkerId,
+          user_id: null,
+          available: true,
+        },
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
 
-    if (!walker) {
-      return null;
+      if (!walker) {
+        return null;
+      }
+
+      const newUser = await User.create(
+        {
+          full_name: userInput.full_name.trim(),
+          email: userInput.email.toLowerCase().trim(),
+          password_hash: userInput.password_hash,
+          role: 'walker',
+          phone: userInput.phone ?? null,
+          profile_photo_url: userInput.profile_photo_url ?? null,
+        },
+        { transaction: t }
+      );
+
+      walker.user_id = newUser.id;
+      await walker.save({ transaction: t });
+
+      const plain = newUser.get({ plain: true });
+      const { password_hash: _pass, ...safeUser } = plain;
+      return safeUser;
     }
 
+    // If walkerId is NOT provided, create the User and create their Walker profile
     const newUser = await User.create(
       {
         full_name: userInput.full_name.trim(),
@@ -157,13 +180,26 @@ export const createWalkerAccountAndLink = async (
       { transaction: t }
     );
 
-    walker.user_id = newUser.id;
-    await walker.save({ transaction: t });
+    await Walker.create(
+      {
+        user_id: newUser.id,
+        name: newUser.full_name,
+        photo_url: newUser.profile_photo_url ?? null,
+        bio: 'Dedicated and caring dog walker ready to provide fun, safe walks for your pets.',
+        rating: 5.0,
+        review_count: 0,
+        price_per_hour: 20.0,
+        available: true,
+      },
+      { transaction: t }
+    );
 
     const plain = newUser.get({ plain: true });
     const { password_hash: _pass, ...safeUser } = plain;
     return safeUser;
   });
 };
+
+export const createWalkerAccountAndLink = createWalkerUser;
 
 export default User;

@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: paw-mate-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fati
+      POSTGRES_PASSWORD: "1234"
+      POSTGRES_DB: paw_mate
+    ports:
+      - "5432:5432"
+    volumes:
+      - paw_mate_data:/var/lib/postgresql
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: paw-mate-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: fati
+      DB_PASSWORD: "1234"
+      DB_NAME: paw_mate
+      JWT_SECRET: change_this_to_a_long_random_secret_for_local_development_2026
+      JWT_EXPIRES_IN: 1d
+    depends_on:
+      - db
+
+volumes:
+  paw_mate_data:
+    external: true
